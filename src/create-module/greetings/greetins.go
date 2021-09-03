@@ -1,8 +1,8 @@
 package greetings
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -29,7 +29,7 @@ func Hellos(names []string) (map[string]string, error) {
 	return messages, nil
 }
 
-func init()  {
+func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
