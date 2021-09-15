@@ -1,2 +1,4 @@
 tmp
 wiki
+data/*
+!data/.gitkeep

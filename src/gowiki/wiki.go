@@ -10,8 +10,8 @@ import (
 	"regexp"
 )
 
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
-var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]*)$")
+var templates = template.Must(template.ParseFiles("tmpl/edit.html", "tmpl/view.html", "tmpl/list.html"))
 
 type Page struct {
 	Title string
@@ -27,17 +27,38 @@ func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
 }
 
 func (p *Page) save() error {
-	filename := p.Title + ".txt"
+	filename := "data/" + p.Title + ".txt"
 	return ioutil.WriteFile(filename, p.Body, 0600)
 }
 
 func loadPage(title string) (*Page, error) {
-	filename := title + ".txt"
+	filename := "data/" + title + ".txt"
 	body, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 	return &Page{Title: title, Body: body}, nil
+}
+
+func loadAllPage() ([]*Page, error) {
+	files, err := ioutil.ReadDir("data")
+	if err != nil {
+		return nil, errors.New("invalid Dir name")
+	}
+
+	pages := []*Page{}
+	for _, file := range files {
+		reg := regexp.MustCompile("(.*).txt")
+		subMatch := reg.FindStringSubmatch(file.Name())
+		title := subMatch[1]
+
+		page, err := loadPage(title)
+		if err != nil {
+			return nil, errors.New("invalid Page name")
+		}
+		pages = append(pages, &Page{Title: title, Body: page.Body})
+	}
+	return pages, nil
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
@@ -56,7 +77,26 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	renderTemplate(w, "view", p)
 }
 
+func listHandler(w http.ResponseWriter, r *http.Request) {
+	pages, err := loadAllPage()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = templates.ExecuteTemplate(w, "list.html", pages)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
+	log.Print(title)
+	if title == "" {
+		renderTemplate(w, "edit", nil)
+		return
+	}
 	p, err := loadPage(title)
 	if err != nil {
 		p = &Page{Title: title}
@@ -65,6 +105,9 @@ func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
+	if title == "" {
+		title = r.FormValue("title")
+	}
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
 	err := p.save()
@@ -91,5 +134,7 @@ func main() {
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
+	http.HandleFunc("/list/", listHandler)
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

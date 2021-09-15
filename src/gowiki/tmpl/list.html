@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+  <h1>List</h1>
+  <p>[<a href="/edit/">New</a>]</p>
+  <ul>
+    {{ range . }}
+    <li><a href="/view/{{ .Title }}">{{ .Title }}</a></li>
+    {{ end }}
+  </ul>
+</html>
