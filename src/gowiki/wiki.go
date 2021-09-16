@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"example.com/gowiki/util"
 	// "fmt"
 	"html/template"
 	"io/ioutil"
@@ -18,10 +19,10 @@ type Page struct {
 	Body  []byte
 }
 
-func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+func getTitle(r *http.Request) (string, error) {
 	m := validPath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
-		return "", errors.New("invalid Page Title")
+		return "", util.InvalidPageTitleError
 	}
 	return m[2], nil // The title is the second subexpression.
 }
@@ -48,8 +49,12 @@ func loadAllPage() ([]*Page, error) {
 
 	pages := []*Page{}
 	for _, file := range files {
+		filename := file.Name()
+		if filename == ".gitkeep" {
+			continue
+		}
 		reg := regexp.MustCompile("(.*).txt")
-		subMatch := reg.FindStringSubmatch(file.Name())
+		subMatch := reg.FindStringSubmatch(filename)
 		title := subMatch[1]
 
 		page, err := loadPage(title)
@@ -92,7 +97,6 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-	log.Print(title)
 	if title == "" {
 		renderTemplate(w, "edit", nil)
 		return
@@ -121,7 +125,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 // 関数リテラルとクロージャーを使って、各ハンドラーで必須の処理（ページタイトルの取得・バリデーション）を共通化
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		title, err := getTitle(w, r)
+		title, err := getTitle(r)
 		if err != nil {
 			http.NotFound(w, r)
 			return
